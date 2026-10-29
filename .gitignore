@@ -1,0 +1,17 @@
+# .deb Packages
+*.deb
+
+# Source packages
+*.dsc
+*.orig.tar.gz
+*.debian.tar.xz
+
+# Downloaded / extracted upstream release artifacts
+Handy_*_amd64/
+Handy_*_arm64/
+Handy-*/
+/usr/
+/DEBIAN/
+
+.idea/*
+.DS_Store

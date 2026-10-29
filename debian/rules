@@ -1,0 +1,54 @@
+#!/usr/bin/make -f
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+HANDY_VERSION := $(shell dpkg-parsechangelog -S Version | sed 's/[-~].*//')
+HANDY_RELEASE := Handy_$(HANDY_VERSION)_$(DEB_HOST_ARCH)
+
+# glibc / libstdc++ floor of upstream's binaries: amd64 is built on Ubuntu
+# 22.04, arm64 on Ubuntu 24.04 (see build_debian.sh)
+ifeq ($(DEB_HOST_ARCH),arm64)
+HANDY_DEPENDS := libc6 (>= 2.39), libstdc++6 (>= 13.2)
+else
+HANDY_DEPENDS := libc6 (>= 2.35), libstdc++6 (>= 12)
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	@case "$(DEB_HOST_ARCH)" in \
+		amd64|arm64) ;; \
+		*) echo "Unsupported architecture: $(DEB_HOST_ARCH)"; exit 1 ;; \
+	esac; \
+	echo "Downloading $(HANDY_RELEASE).deb..."; \
+	wget -q "https://github.com/cjpais/Handy/releases/download/v$(HANDY_VERSION)/$(HANDY_RELEASE).deb"; \
+	dpkg-deb -x "$(HANDY_RELEASE).deb" "$(HANDY_RELEASE)"; \
+	rm -f "$(HANDY_RELEASE).deb"; \
+	[ -f "$(HANDY_RELEASE)/usr/bin/handy" ] || { echo "Unexpected package layout: $(HANDY_RELEASE)/usr/bin/handy not found"; exit 1; }
+
+override_dh_auto_install:
+	install -d -m 755 debian/handy/usr
+	cp -r "$(HANDY_RELEASE)/usr/." debian/handy/usr/
+	sed -i -e "s/^Categories=.*/Categories=Utility;Accessibility;AudioVideo;/" \
+	       -e "s/^Comment=.*/Comment=Offline speech-to-text/" \
+	       debian/handy/usr/share/applications/Handy.desktop
+	chmod 755 debian/handy/usr/bin/handy
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf Handy_*_amd64 Handy_*_arm64 Handy_*.deb || true
+
+override_dh_gencontrol:
+	dh_gencontrol -- -Vhandy:Depends="$(HANDY_DEPENDS)"
+
+# Prebuilt upstream binaries: keep them as shipped. The private libraries in
+# usr/lib/Handy are not public shared libraries, so no shlibs/symbols for them.
+override_dh_strip:
+
+override_dh_dwz:
+
+override_dh_shlibdeps:
+
+override_dh_makeshlibs:
